@@ -11,7 +11,7 @@ from game import persistence
 global __dcs_saved_game_directory
 global __dcs_installation_directory
 global __last_save_file
-
+global __nimbuspulse_token
 
 USER_PATH = Path(os.environ["LOCALAPPDATA"]) / "DCSLiberation"
 
@@ -23,6 +23,7 @@ def init():
     global __dcs_installation_directory
     global __last_save_file
     global __ignore_empty_install_directory
+    global __nimbuspulse_token
 
     if PREFERENCES_PATH.exists():
         try:
@@ -35,6 +36,7 @@ def init():
             __ignore_empty_install_directory = pref_data.get(
                 "ignore_empty_install_directory", False
             )
+            __nimbuspulse_token = pref_data["nimbuspulse_token"]
             is_first_start = False
         except (KeyError, ValueError):
             # KeyError in case of missing contents, ValueError in case of decoding
@@ -43,9 +45,11 @@ def init():
             __dcs_installation_directory = ""
             __last_save_file = ""
             __ignore_empty_install_directory = False
+            __nimbuspulse_token = ""
             is_first_start = True
     else:
         __last_save_file = ""
+        __nimbuspulse_token = ""
         __ignore_empty_install_directory = False
         try:
             __dcs_saved_game_directory = (
@@ -67,11 +71,13 @@ def init():
     return is_first_start
 
 
-def setup(saved_game_dir, install_dir):
+def setup(saved_game_dir, install_dir, nimbuspulse_token):
     global __dcs_saved_game_directory
     global __dcs_installation_directory
+    global __nimbuspulse_token
     __dcs_saved_game_directory = saved_game_dir
     __dcs_installation_directory = install_dir
+    __nimbuspulse_token = nimbuspulse_token
     persistence.set_dcs_save_game_directory(Path(__dcs_saved_game_directory))
 
 
@@ -85,11 +91,14 @@ def save_config():
     global __dcs_installation_directory
     global __last_save_file
     global __ignore_empty_install_directory
+    global __nimbuspulse_token
+
     pref_data = {
         "saved_game_dir": __dcs_saved_game_directory,
         "dcs_install_dir": __dcs_installation_directory,
         "last_save_file": __last_save_file,
         "ignore_empty_install_directory": __ignore_empty_install_directory,
+        "nimbuspulse_token": __nimbuspulse_token,
     }
     PREFERENCES_PATH.parent.mkdir(exist_ok=True, parents=True)
     with PREFERENCES_PATH.open("w") as prefs:
@@ -109,6 +118,11 @@ def get_saved_game_dir():
 def ignore_empty_install_directory():
     global __ignore_empty_install_directory
     return __ignore_empty_install_directory
+
+
+def get_nimbuspulse_token():
+    global __nimbuspulse_token
+    return __nimbuspulse_token
 
 
 def set_ignore_empty_install_directory(value: bool):

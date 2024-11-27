@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QScrollArea,
+    QLineEdit
 )
 
 import qt_ui.uiconstants as CONST
@@ -31,6 +32,7 @@ from game.settings import (
     ChoicesOption,
     MinutesOption,
     OptionDescription,
+    StringOption,
     Settings,
 )
 from game.sim import GameUpdateEvents
@@ -124,6 +126,8 @@ class AutoSettingsLayout(QGridLayout):
                 self.add_spinner_for(row, name, description)
             elif isinstance(description, MinutesOption):
                 self.add_duration_controls_for(row, name, description)
+            elif isinstance(description, StringOption):
+                self.add_text_edit_for(row, name, description)
             else:
                 raise TypeError(f"Unhandled option type: {description}")
 
@@ -212,6 +216,16 @@ class AutoSettingsLayout(QGridLayout):
 
         inputs.spinner.valueChanged.connect(on_changed)
         self.addLayout(inputs, row, 1, Qt.AlignRight)
+ 
+    def add_text_edit_for(self, row: int, name: str, description: StringOption) -> None:
+        def on_edit(value: str) -> None:
+            self.settings.__dict__[name] = value
+
+        text_edit = QLineEdit()
+        value = self.settings.__dict__[name]
+        text_edit.setText(value)
+        text_edit.textChanged.connect(on_edit)
+        self.addWidget(text_edit, row, 1, Qt.AlignRight)
 
 
 class AutoSettingsGroup(QGroupBox):

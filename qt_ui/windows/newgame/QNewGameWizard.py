@@ -30,6 +30,8 @@ from qt_ui.widgets.spinsliders import CurrencySpinner, FloatSpinSlider, TimeInpu
 from qt_ui.windows.AirWingConfigurationDialog import AirWingConfigurationDialog
 from qt_ui.windows.GameUpdateSignal import GameUpdateSignal
 from qt_ui.windows.newgame.QCampaignList import QCampaignList
+from qt_ui.nimbuspulse import Client
+from qt_ui import liberation_install
 
 jinja_env = Environment(
     loader=FileSystemLoader("resources/ui/templates"),
@@ -132,6 +134,7 @@ class NewGameWizard(QtWidgets.QWizard):
         )
         self.addPage(self.difficulty_page)
         self.addPage(self.plugins_page)
+        self.addPage(NimbusPulseServerSetup(default_settings, mod_settings))
         self.addPage(ConclusionPage())
 
         self.setPixmap(
@@ -899,6 +902,194 @@ class GeneratorOptions(QtWidgets.QWizardPage):
         mlayout.addWidget(modSettingsGroup)
         mlayout.addWidget(modHelpText)
         self.setLayout(mlayout)
+
+class NimbusPulseServerSetup(QtWidgets.QWizardPage):
+    def __init__(
+        self, default_settings: Settings, mod_settings: ModSettings, parent=None
+    ) -> None:
+        super().__init__(parent)
+        self.setTitle("NimbusPulse Server Setup")
+        self.setSubTitle("Configure your NimbusPulse server.")
+        self.setPixmap(
+            QtWidgets.QWizard.LogoPixmap,
+            QtGui.QPixmap("./resources/ui/wizard/logo1.png"),
+        )
+
+        self.selected_server = None  # Store selected server details
+
+        self.main_layout = QtWidgets.QVBoxLayout()
+
+        # Initial View: Server Selection
+        self.init_selection_view()
+
+        # Final View: Server Details
+        self.init_details_view()
+
+        self.setLayout(self.main_layout)
+
+        # Show selection view initially
+        self.show_selection_view()
+
+    def init_selection_view(self):
+        """Initialize the selection view."""
+        self.selection_view = QWidget()
+        selection_layout = QVBoxLayout()
+
+        # Toggle between existing and new server
+        self.toggle_group = QtWidgets.QButtonGroup(self)
+        self.existing_server_toggle = QtWidgets.QRadioButton("Select Existing Server")
+        self.new_server_toggle = QtWidgets.QRadioButton("Create New Server")
+        self.new_server_toggle.setChecked(True)  # Default to creating a new server
+        self.toggle_group.addButton(self.existing_server_toggle)
+        self.toggle_group.addButton(self.new_server_toggle)
+
+        selection_layout.addWidget(self.existing_server_toggle)
+        selection_layout.addWidget(self.new_server_toggle)
+
+        # Existing Server Section
+        self.existing_server_label = QLabel("Existing Servers:")
+        self.existing_server_dropdown = QtWidgets.QComboBox()
+        self.populate_existing_servers()
+
+        self.refresh_button = QtWidgets.QPushButton("Refresh List")
+        self.refresh_button.clicked.connect(self.populate_existing_servers)
+
+        self.select_server_button = QtWidgets.QPushButton("Select Server")
+        self.select_server_button.clicked.connect(self.select_existing_server)
+
+        existing_server_layout = QVBoxLayout()
+        existing_server_layout.addWidget(self.existing_server_label)
+        existing_server_layout.addWidget(self.existing_server_dropdown)
+        existing_server_layout.addWidget(self.refresh_button)
+        existing_server_layout.addWidget(self.select_server_button)
+
+        self.existing_server_group = QWidget()
+        self.existing_server_group.setLayout(existing_server_layout)
+
+        # New Server Section
+        self.new_server_name_label = QLabel("Server Name:")
+        self.new_server_name_input = QtWidgets.QLineEdit()
+
+        self.new_server_password_label = QLabel("Server Password:")
+        self.new_server_password_input = QtWidgets.QLineEdit()
+        self.new_server_password_input.setEchoMode(QtWidgets.QLineEdit.Password)
+
+        self.new_slots_label = QLabel("Player Slots:")
+        self.new_slots_spinner = QtWidgets.QSpinBox()
+        self.new_slots_spinner.setRange(1, 100)
+
+        self.create_server_button = QtWidgets.QPushButton("Create Server")
+        self.create_server_button.clicked.connect(self.create_new_server)
+
+        new_server_layout = QVBoxLayout()
+        new_server_layout.addWidget(self.new_server_name_label)
+        new_server_layout.addWidget(self.new_server_name_input)
+        new_server_layout.addWidget(self.new_server_password_label)
+        new_server_layout.addWidget(self.new_server_password_input)
+        new_server_layout.addWidget(self.new_slots_label)
+        new_server_layout.addWidget(self.new_slots_spinner)
+        new_server_layout.addWidget(self.create_server_button)
+
+        self.new_server_group = QWidget()
+        self.new_server_group.setLayout(new_server_layout)
+
+        selection_layout.addWidget(self.existing_server_group)
+        selection_layout.addWidget(self.new_server_group)
+
+        # Toggle visibility of sections
+        self.existing_server_toggle.toggled.connect(self.update_selection_view)
+        self.new_server_toggle.toggled.connect(self.update_selection_view)
+
+        self.selection_view.setLayout(selection_layout)
+
+        # Ensure visibility is updated based on the initial selection
+        self.update_selection_view()
+
+    def init_details_view(self):
+        """Initialize the details view for a selected server."""
+        self.details_view = QWidget()
+        details_layout = QVBoxLayout()
+
+        self.server_name_label = QLabel("Server Name: -")
+        self.server_ip_label = QLabel("IP Address: -")
+        self.server_port_label = QLabel("Port: -")
+
+        details_layout.addWidget(self.server_name_label)
+        details_layout.addWidget(self.server_ip_label)
+        details_layout.addWidget(self.server_port_label)
+
+        self.change_server_button = QtWidgets.QPushButton("Change Server")
+        self.change_server_button.clicked.connect(self.show_selection_view)
+        details_layout.addWidget(self.change_server_button)
+
+        self.details_view.setLayout(details_layout)
+
+    def populate_existing_servers(self):
+        """Populate the existing server dropdown with UUIDs and names."""
+        servers = Client(liberation_install.get_nimbuspulse_token()).get_servers()
+        self.existing_server_dropdown.clear()
+
+        for server in servers:
+            server_name = server.get("dcs_settings", {}).get("initial_server_name", "Unnamed Server")
+            server_id = server.get("id", "Unknown ID")
+            self.existing_server_dropdown.addItem(server_name, server)
+
+        if not servers:
+            self.existing_server_dropdown.addItem("No servers available", None)
+
+    def update_selection_view(self):
+        """Update the visibility of server sections based on toggle."""
+        self.existing_server_group.setVisible(self.existing_server_toggle.isChecked())
+        self.new_server_group.setVisible(self.new_server_toggle.isChecked())
+
+    def select_existing_server(self):
+        """Handle selecting an existing server."""
+        server = self.existing_server_dropdown.currentData()
+        if server:
+            self.selected_server = server
+            self.show_details_view()
+
+    def create_new_server(self):
+        """Handle creating a new server."""
+        server_name = self.new_server_name_input.text()
+        server_password = self.new_server_password_input.text()
+        player_slots = self.new_slots_spinner.value()
+        product_id = "01920555-2bd1-7877-9c08-990c708ab93f"
+        active_mods = []
+        terrains = ["Caucasus"]
+
+        new_server = Client(liberation_install.get_nimbuspulse_token()).create_server(
+            name=server_name,
+            password=server_password,
+            max_players=player_slots,
+            plan=product_id,
+            active_mods=active_mods,
+            terrains=terrains,
+            credentials=None,
+            use_voice_chat=False
+        )
+
+        # The server is created if this is reached, but get the server from .get_servers() to ensure it's up to date
+        servers = Client(liberation_install.get_nimbuspulse_token()).get_servers()
+        self.selected_server = next(
+            (s for s in servers if s.get("id") == new_server.get("id")), new_server
+        )
+        self.show_details_view()
+
+    def show_selection_view(self):
+        """Show the server selection view."""
+        self.main_layout.removeWidget(self.details_view)
+        self.details_view.setParent(None)
+        self.main_layout.addWidget(self.selection_view)
+
+    def show_details_view(self):
+        """Show the server details view."""
+        self.server_name_label.setText(f"Server Name: {self.selected_server['dcs_settings']['initial_server_name']}")
+        self.server_ip_label.setText(f"IP Address: {self.selected_server.get('ip', '-')}")
+        self.server_port_label.setText(f"Port: {self.selected_server.get('port', '-')}")
+        self.main_layout.removeWidget(self.selection_view)
+        self.selection_view.setParent(None)
+        self.main_layout.addWidget(self.details_view)
 
 
 class ConclusionPage(QtWidgets.QWizardPage):

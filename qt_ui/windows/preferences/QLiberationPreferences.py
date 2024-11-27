@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
+from qt_ui.nimbuspulse import Client
 
 from qt_ui import liberation_install, liberation_theme
 from qt_ui.liberation_theme import THEMES, get_theme_index, set_theme_index
@@ -22,16 +23,20 @@ class QLiberationPreferences(QFrame):
         super(QLiberationPreferences, self).__init__()
         self.saved_game_dir = ""
         self.dcs_install_dir = ""
+        self.nimbuspulse_token = ""
         self.install_dir_ignore_warning = False
 
         self.dcs_install_dir = liberation_install.get_dcs_install_directory()
         self.saved_game_dir = liberation_install.get_saved_game_dir()
+        self.nimbuspulse_token = liberation_install.get_nimbuspulse_token()
 
         self.edit_dcs_install_dir = QLineEdit(self.dcs_install_dir)
         self.edit_saved_game_dir = QLineEdit(self.saved_game_dir)
+        self.edit_nimbuspulse_token = QLineEdit(self.nimbuspulse_token)
 
         self.edit_dcs_install_dir.setMinimumWidth(300)
         self.edit_saved_game_dir.setMinimumWidth(300)
+        self.edit_nimbuspulse_token.setMinimumWidth(300)
 
         self.browse_saved_game = QPushButton("Browse...")
         self.browse_saved_game.clicked.connect(self.on_browse_saved_games)
@@ -61,8 +66,17 @@ class QLiberationPreferences(QFrame):
         )
         layout.addWidget(self.edit_dcs_install_dir, 3, 0, alignment=Qt.AlignRight)
         layout.addWidget(self.browse_install_dir, 3, 1, alignment=Qt.AlignRight)
-        layout.addWidget(QLabel("<strong>Theme (Requires Restart)</strong>"), 4, 0)
-        layout.addWidget(self.themeSelect, 4, 1, alignment=Qt.AlignRight)
+
+        layout.addWidget(
+            QLabel("<strong>NimbusPulse token:</strong> <a href=\"https://nimbuspulse.com/settings\">Get Token</a>"),
+             4,
+            0,
+            alignment=Qt.AlignLeft,
+        )
+        layout.addWidget(self.edit_nimbuspulse_token, 5, 0, alignment=Qt.AlignRight)
+
+        layout.addWidget(QLabel("<strong>Theme (Requires Restart)</strong>"), 6, 0)
+        layout.addWidget(self.themeSelect, 6, 1, alignment=Qt.AlignRight)
         self.themeSelect.setCurrentIndex(get_theme_index())
 
         main_layout.addLayout(layout)
@@ -90,6 +104,7 @@ class QLiberationPreferences(QFrame):
         print("Applying changes")
         self.saved_game_dir = self.edit_saved_game_dir.text()
         self.dcs_install_dir = self.edit_dcs_install_dir.text()
+        self.nimbuspulse_token = self.edit_nimbuspulse_token.text()
         set_theme_index(self.themeSelect.currentIndex())
 
         if not os.path.isdir(self.saved_game_dir):
@@ -144,8 +159,21 @@ class QLiberationPreferences(QFrame):
             )
             error_dialog.exec_()
             return False
+        
+        try:
+            client =  Client(self.nimbuspulse_token)
+            client.get_servers()
+        except Exception as e:
+            error_dialog = QMessageBox.critical(
+                self,
+                "NimbusPulse Error",
+                "Could not connect to NimbusPulse with the provided token, please check the token and try again.",
+                QMessageBox.StandardButton.Ok,
+            )
+            error_dialog.exec_()
+            return False
 
-        liberation_install.setup(self.saved_game_dir, self.dcs_install_dir)
+        liberation_install.setup(self.saved_game_dir, self.dcs_install_dir, self.nimbuspulse_token)
         liberation_install.save_config()
         liberation_theme.save_theme_config()
         return True

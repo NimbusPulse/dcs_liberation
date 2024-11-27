@@ -14,6 +14,7 @@ from .boundedfloatoption import bounded_float_option
 from .boundedintoption import bounded_int_option
 from .choicesoption import choices_option
 from .minutesoption import minutes_option
+from .stringoption import string_option
 from .optiondescription import OptionDescription, SETTING_DESCRIPTION_KEY
 from .skilloption import skill_option
 from ..ato.starttype import StartType
@@ -58,6 +59,8 @@ PILOTS_AND_SQUADRONS_SECTION = "Pilots and Squadrons"
 HQ_AUTOMATION_SECTION = "HQ Automation"
 
 MISSION_GENERATOR_PAGE = "Mission Generator"
+
+NIMBUSPULSE_PAGE = "NimbusPulse"
 
 COMMANDERS_SECTION = "Battlefield Commanders"
 
@@ -551,6 +554,13 @@ class Settings:
         section=PERFORMANCE_SECTION,
         default=True,
         causes_expensive_game_update=True,
+    )
+
+    nimbuspulse_server_id: str = string_option(
+        "NimbusPulse Server ID where the mission should be hosted",
+        page=NIMBUSPULSE_PAGE,
+        section="Selected Server",
+        default="",
     )
 
     # Cheating. Not using auto settings because the same page also has buttons which do
